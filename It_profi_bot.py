@@ -18,7 +18,7 @@ def get_text_messages(message):
     if message.text.lower() == 'привет' or message.text.lower() == 'добрый день':
         bot.send_message(message.from_user.id, 'Привет! Давай посмотрим на список твоих дел!')
         keyboard = types.InlineKeyboardMarkup()
-        key_tasks = types.InlineKeyboardButton(text = 'Список всех дел', callback_data='tasks')
+        key_tasks = types.InlineKeyboardButton(text='Список всех дел', callback_data='tasks')
         keyboard.add(key_tasks)
         key_add_task = types.InlineKeyboardButton(text='Добавить новую задачу', callback_data='add_task')
         keyboard.add(key_add_task)
