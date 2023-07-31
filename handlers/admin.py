@@ -3,6 +3,9 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.filters import Text
 from create_bot import bot
+from data_base import sql_db
+from keyboards import admin_kb
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 ID = None
 
@@ -17,7 +20,7 @@ class FSMAdmin(StatesGroup):
 async def make_changes_command(message: types.Message):
     global ID
     ID = message.from_user.id
-    await bot.send_message(message.from_user.id, 'Приветствую хозяин!')
+    await bot.send_message(message.from_user.id, 'Приветствую хозяин!', reply_markup=admin_kb.button_case_admin)
     await message.delete()
 
 
@@ -64,13 +67,28 @@ async def enter_description(message: types.Message, state: FSMContext):
     if message.from_user.id == ID:
         async with state.proxy() as data:
             data['description'] = message.text
-        async with state.proxy() as data:
-            await message.reply(str(data))
+
+        await sql_db.sql_add_command(state)
         await state.finish()
 
 
+async def del_callback_run(callback_query: types.CallbackQuery):
+    await sql_db.sql_delete_command(callback_query.data.replace('del', ''))
+    await callback_query.answer(text=f'{callback_query.data.replace("del", "")} удалена.', show_alert=True)
+
+
+async def delete_item(message: types.Message):
+    if message.from_user.id == ID:
+        read = await sql_db.sql_read2()
+        for ret in read:
+            await bot.send_message(message.from_user.id, ret[0],
+                                   f'Задача: {ret[0]}\nДата: {ret[1]}\nВремя: {ret[2]}\nОписание: {ret[3]}')
+            await bot.send_message(message.from_user.id, text='^^^', reply_markup=InlineKeyboardMarkup().\
+                                   add(InlineKeyboardButton(f'Удалить {ret[0]}', callback_data=f'del{ret[0]}')))
+
+
 def register_handlers_admin(dp: Dispatcher):
-    dp.register_message_handler(dialog_start, commands=['Начало'], state=None)
+    dp.register_message_handler(dialog_start, commands=['Добавить'], state=None)
     dp.register_message_handler(cancel_handler, commands=['отмена'], state="*")
     dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state="*")
     dp.register_message_handler(enter_name, state=FSMAdmin.name_task)
@@ -78,3 +96,5 @@ def register_handlers_admin(dp: Dispatcher):
     dp.register_message_handler(enter_time, state=FSMAdmin.time_task)
     dp.register_message_handler(enter_description, state=FSMAdmin.description_task)
     dp.register_message_handler(make_changes_command, commands=['moderator'])
+    dp.register_message_handler(del_callback_run, lambda x: x.data and x.data.startswith('del '))
+    dp.register_message_handler(delete_item, commands=['Удалить'])
