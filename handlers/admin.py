@@ -6,6 +6,7 @@ from create_bot import bot
 from data_base import sql_db
 from keyboards import admin_kb
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.dispatcher.filters import Text
 
 ID = None
 
@@ -69,22 +70,24 @@ async def enter_description(message: types.Message, state: FSMContext):
             data['description'] = message.text
 
         await sql_db.sql_add_command(state)
+        await bot.send_message(message.from_user.id, 'Новое дело успешно добавлено!')
         await state.finish()
 
 
-async def del_callback_run(callback_query: types.CallbackQuery):
-    await sql_db.sql_delete_command(callback_query.data.replace('del', ''))
-    await callback_query.answer(text=f'{callback_query.data.replace("del", "")} удалена.', show_alert=True)
+async def del_callback_run(callback: types.CallbackQuery):
+    if callback.data and callback.data.startswith('del '):
+        await sql_db.sql_delete_command(callback.data.replace('del ', ''))
+        await callback.answer(text=f'{callback.data.replace("del ", "")} удалена.', show_alert=True)
 
 
 async def delete_item(message: types.Message):
     if message.from_user.id == ID:
         read = await sql_db.sql_read2()
         for ret in read:
-            await bot.send_message(message.from_user.id, ret[0],
-                                   f'Задача: {ret[0]}\nДата: {ret[1]}\nВремя: {ret[2]}\nОписание: {ret[3]}')
-            await bot.send_message(message.from_user.id, text='^^^', reply_markup=InlineKeyboardMarkup().\
-                                   add(InlineKeyboardButton(f'Удалить {ret[0]}', callback_data=f'del{ret[0]}')))
+            await bot.send_message(message.from_user.id,
+                                   f'{ret[0]}\nДата: {ret[1]}\nВремя: {ret[2]}\nОписание: {ret[3]}')
+            await bot.send_message(message.from_user.id, 'Удалить из списка дел?', reply_markup=InlineKeyboardMarkup(). \
+                                   add(InlineKeyboardButton(f'Удалить {ret[0]}', callback_data=f'del {ret[0]}')))
 
 
 def register_handlers_admin(dp: Dispatcher):
@@ -96,5 +99,5 @@ def register_handlers_admin(dp: Dispatcher):
     dp.register_message_handler(enter_time, state=FSMAdmin.time_task)
     dp.register_message_handler(enter_description, state=FSMAdmin.description_task)
     dp.register_message_handler(make_changes_command, commands=['moderator'])
-    dp.register_message_handler(del_callback_run, lambda x: x.data and x.data.startswith('del '))
+    dp.register_callback_query_handler(del_callback_run)
     dp.register_message_handler(delete_item, commands=['Удалить'])
