@@ -93,12 +93,14 @@ def register_handlers_admin(dp: Dispatcher):
     dp.register_message_handler(command_start, commands=['start', 'help'])
     dp.register_message_handler(my_tasks_command, commands=['Мои_дела'])
     dp.register_message_handler(dialog_start, commands=['Добавить'], state=None)
+    dp.register_message_handler(delete_item, commands=['Удалить'])
     dp.register_message_handler(cancel_handler, commands=['отмена'], state="*")
     dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state="*")
+    dp.register_message_handler(any_text)
     dp.register_message_handler(enter_name, state=FSMAdmin.name_task)
     dp.register_message_handler(enter_date, state=FSMAdmin.date_task)
     dp.register_message_handler(enter_time, state=FSMAdmin.time_task)
     dp.register_message_handler(enter_description, state=FSMAdmin.description_task)
     dp.register_callback_query_handler(del_callback_run)
-    dp.register_message_handler(delete_item, commands=['Удалить'])
-    dp.register_message_handler(any_text)
+
+
