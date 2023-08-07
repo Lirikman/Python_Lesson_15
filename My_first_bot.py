@@ -2,6 +2,7 @@ from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -17,11 +18,12 @@ async def on_startup(_):
     print('Бот онлайн')
     sql_start()
 
+
 b1 = KeyboardButton('/Дела')
 b2 = KeyboardButton('/Добавить')
 b3 = KeyboardButton('/Удалить')
 
-kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+kb = ReplyKeyboardMarkup(resize_keyboard=True) #one_time_keyboard=True)
 kb.add(b1).row(b2, b3)
 
 base = sq.connect('my_task.db')
@@ -32,14 +34,25 @@ def sql_start():
     global base, cur
     if base:
         print('База данных успешно подключена!')
-    base.execute('CREATE TABLE IF NOT EXISTS menu(name TEXT, date TEXT, time TEXT, description TEXT)')
+    base.execute('CREATE TABLE IF NOT EXISTS tasks(name TEXT, date TEXT, time TEXT, description TEXT)')
     base.commit()
 
 
 async def sql_add_command(state):
-    async with state.proxy as data:
-        cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)', tuple(data.values()))
+    async with state.proxy() as data:
+        cur.execute('INSERT INTO tasks VALUES (?, ?, ?, ?)', tuple(data.values()))
         base.commit()
+
+
+async def sql_delete_command(data):
+    cur.execute('DELETE FROM tasks WHERE name == ?', (data,))
+    base.commit()
+
+
+@dp.callback_query_handler(lambda x: x.data and x.data.startswith('del '))
+async def del_callback_run(callback: types.CallbackQuery):
+    await sql_delete_command(callback.data.replace('del ', ''))
+    await callback.answer(text=f'{callback.data.replace("del ", "")} удалена.', show_alert=True)
 
 
 @dp.message_handler(commands=['start', 'help'])
@@ -49,17 +62,19 @@ async def command_start(message: types.Message):
 
 @dp.message_handler(commands=['Дела'])
 async def command_start(message: types.Message):
-    await bot.send_message(message.from_user.id, 'Список дел пуст!')
-
-
-#@dp.message_handler(commands=['Добавить'])
-#async def command_start(message: types.Message):
-#    await bot.send_message(message.from_user.id, 'Дело успешно добавлено!')
+    for ret in cur.execute('SELECT * FROM tasks').fetchall():
+        await bot.send_message(message.from_user.id, (f'Задача: {ret[0]}\nДата: {ret[1]}\n'
+                                                      f'Время: {ret[2]}\nОписание: {ret[3]}'))
 
 
 @dp.message_handler(commands=['Удалить'])
-async def command_start(message: types.Message):
-    await bot.send_message(message.from_user.id, 'Дело успешно удалено!')
+async def command_delete(message: types.Message):
+    for ret in cur.execute('SELECT * FROM tasks').fetchall():
+        await bot.send_message(message.from_user.id, (f'Задача: {ret[0]}\nДата: {ret[1]}\n'
+                                                      f'Время: {ret[2]}\nОписание: {ret[3]}'))
+        await bot.send_message(message.from_user.id, text='^^^ ВЫ ХОТИТЕ УДАЛИТЬ ЭТО ДЕЛО? ^^^',
+                               reply_markup=InlineKeyboardMarkup(). \
+                               add(InlineKeyboardButton(f'Удалить {ret[0]}', callback_data=f'del {ret[0]}')))
 
 
 class FSMBot(StatesGroup):
